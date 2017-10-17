@@ -95,12 +95,17 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
                 id: Boolean = false,
                 version: Boolean = false,
                 notNull: Boolean = !property.returnType.isMarkedNullable,
-                default: R = default(property.returnType),
+                default: R = default<R>(property.returnType),
                 converter: Converter<R> = converter(property.returnType),
                 name: String? = null,
-                selectByDefault: Boolean = true): DelegatedColumn<R> {
+                selectByDefault: Boolean = true,
+                mapConverter: (String) -> R = Column.NoMapConverter): DelegatedColumn<R> {
 
-        val column = Column<T, R>({ property.get(it) }, default, converter, name ?: "", id, version, selectByDefault, !notNull)
+        val column = Column<T, R>(
+                { property.get(it) }, default, converter,
+                name ?: "", id, version, selectByDefault, !notNull,
+                mapConverter)
+
         return DelegatedColumn(column)
     }
 
@@ -112,11 +117,15 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
                    default: R = default<R>(property.returnType),
                    converter: Converter<R> = converter(property.returnType),
                    name: String? = null,
-                   selectByDefault: Boolean = true
-
+                   selectByDefault: Boolean = true,
+                   mapConverter: (String) -> R = Column.NoMapConverter
     ): DelegatedColumn<R> {
 
-        val column = Column<T, R>({ property.get(path(it)) }, default, converter, name ?: "", id, version, selectByDefault, !notNull)
+        val column = Column<T, R>(
+                { property.get(path(it)) }, default, converter,
+                name ?: "", id, version, selectByDefault, !notNull,
+                mapConverter)
+
         return DelegatedColumn(column)
     }
 
@@ -130,11 +139,15 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
                            version: Boolean = false,
                            converter: Converter<R> = converter(property.returnType),
                            name: String? = null,
-                           selectByDefault: Boolean = true
-
+                           selectByDefault: Boolean = true,
+                           mapConverter: (String) -> R = Column.NoMapConverter
     ): DelegatedColumn<R?> {
 
-        val column = Column<T, R?>({ path(it)?.let { property.get(it) } }, null, optional(converter), name ?: "", id, version, selectByDefault, true)
+        val column = Column<T, R?>(
+                { path(it)?.let { property.get(it) } }, null, optional(converter),
+                name ?: "", id, version, selectByDefault, true,
+                mapConverter)
+
         return DelegatedColumn(column)
     }
 
@@ -199,13 +212,32 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
         return map
     }
 
-    fun rowMapper(columns: Set<Column<T, *>> = defaultColumns, nf: (Column<T, *>) -> String = columnName): (Row) -> T {
+    fun rowMapper(
+            columns: Set<Column<T, *>> = defaultColumns, nf: (Column<T, *>) -> String = columnName
+    ): (Row) -> T {
         return { row ->
             create(object : Value<T> {
+                override fun <R> of(column: Column<T, R>): R =
+                        if (column in columns) column.converter.from(row, nf(column)) else column.defaultValue
+            })
+        }
+    }
+
+    fun mapMapper(
+            columns: Set<Column<T, *>> = defaultColumns, nf: (Column<T, *>) -> String = columnName
+    ): (Map<String, String>) -> T {
+        return { map ->
+            create(object : Value<T> {
                 override fun <R> of(column: Column<T, R>): R {
-                    return if (columns.contains(column)) column.converter.from(row, nf(column)) else column.defaultValue
+                    val fieldName = nf(column)
+
+                    return if (column in columns && fieldName in map)
+                        column.mapConverter(map[fieldName]!!)
+                    else
+                        column.defaultValue
                 }
             })
         }
     }
+
 }

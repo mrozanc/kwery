@@ -14,7 +14,8 @@ class Issue11_12 {
         val emailColumn = Column(
                 User::email, null,
                 optional(stringConverter),
-                "email", false, false, true, false
+                "email", false, false, true, false,
+                Column.NoMapConverter
         )
 
         usersTable.addColumn(emailColumn)

@@ -48,7 +48,13 @@ data class Column<C, T>(
         /**
          * True if the column is nullable
          */
-        val isNullable: Boolean
+        val isNullable: Boolean,
+
+        /**
+         * A converter which will be used in [Table.mapMapper]
+         * default value is set to maintain source compatibility with possible constructor invocations
+         */
+        val mapConverter: (String) -> T = NoMapConverter
 ) {
     /**
      * A type-safe variant of `to`
@@ -64,4 +70,10 @@ data class Column<C, T>(
     override fun toString(): String {
         return "Column($name id=$id version=$version nullable=$isNullable)" // Prevent NPE in debugger on "property"
     }
+
+    companion object {
+        val NoMapConverter: (String) -> Nothing =
+                { throw UnsupportedOperationException("there's no mapConverter on this column") }
+    }
+
 }
