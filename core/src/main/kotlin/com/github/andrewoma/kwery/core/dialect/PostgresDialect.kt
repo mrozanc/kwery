@@ -49,4 +49,8 @@ open class PostgresDialect : Dialect {
             "select nextval('$sequence') as $columnName from generate_series(1, $count)"
 
     override val supportsFetchingGeneratedKeysByName = true
+
+    override fun escapeColumnName(columnName: String): String =
+            '"' + columnName.replace("\"", "\"\"") + '"'
+
 }
