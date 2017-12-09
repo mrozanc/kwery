@@ -55,6 +55,8 @@ interface Dialect {
                 .joinToString(" ")
         return sql + "\n" + limitAndOffset
     }
+
+    fun escapeColumnName(columnName: String): String = columnName
 }
 
 internal fun String.truncate(limit: Int): String {
