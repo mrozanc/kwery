@@ -47,4 +47,8 @@ open class MysqlDialect : Dialect {
     override fun allocateIds(count: Int, sequence: String, columnName: String) = throw UnsupportedOperationException()
 
     override val supportsFetchingGeneratedKeysByName = false
+
+    override fun escapeColumnName(columnName: String): String =
+            '`' + columnName.replace("`", "``") + '`'
+
 }
