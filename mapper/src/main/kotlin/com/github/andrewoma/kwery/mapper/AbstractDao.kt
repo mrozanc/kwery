@@ -76,11 +76,11 @@ abstract class AbstractDao<T : Any, ID : Any>(
     }
 
     protected fun Iterable<Column<T, *>>.join(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
-        return this.map { f(it) }.joinToString(separator)
+        return this.map { session.dialect.escapeColumnName(f(it)) }.joinToString(separator)
     }
 
     protected fun Iterable<Column<T, *>>.equate(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
-        return this.map { "${f(it)} = :${f(it)}" }.joinToString(separator)
+        return this.map { "${session.dialect.escapeColumnName(f(it))} = :${f(it)}" }.joinToString(separator)
     }
 
     protected fun Collection<ID>.copyToSqlArray(): java.sql.Array {
