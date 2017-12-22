@@ -56,7 +56,7 @@ interface Dialect {
         return sql + "\n" + limitAndOffset
     }
 
-    fun escapeColumnName(columnName: String): String = columnName
+    fun escapeName(columnName: String): String = columnName
 }
 
 internal fun String.truncate(limit: Int): String {

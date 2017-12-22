@@ -50,7 +50,7 @@ open class PostgresDialect : Dialect {
 
     override val supportsFetchingGeneratedKeysByName = true
 
-    override fun escapeColumnName(columnName: String): String =
+    override fun escapeName(columnName: String): String =
             '"' + columnName.replace("\"", "\"\"") + '"'
 
 }

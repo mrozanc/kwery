@@ -48,7 +48,7 @@ open class MysqlDialect : Dialect {
 
     override val supportsFetchingGeneratedKeysByName = false
 
-    override fun escapeColumnName(columnName: String): String =
+    override fun escapeName(columnName: String): String =
             '`' + columnName.replace("`", "``") + '`'
 
 }
