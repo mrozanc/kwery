@@ -47,4 +47,8 @@ open class SqliteDialect : Dialect {
     override fun allocateIds(count: Int, sequence: String, columnName: String) = throw UnsupportedOperationException()
 
     override val supportsFetchingGeneratedKeysByName = false
+
+    override fun escapeName(columnName: String): String =
+            '"' + columnName.replace("\"", "\"\"") + '"'
+
 }
