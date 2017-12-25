@@ -46,10 +46,19 @@ interface Dao<T : Any, ID : Any> {
 
     fun findAll(columns: Set<Column<T, *>> = defaultColumns, order: Map<Column<T, *>, OrderByDirection> = defaultOrder): List<T>
 
+    @Deprecated(message = "Only for binary compatibility.", level = DeprecationLevel.HIDDEN)
+    fun findAll(columns: Set<Column<T, *>> = defaultColumns): List<T> = findAll(columns, defaultOrder)
+
     fun findByExample(
             example: T, exampleColumns: Set<Column<T, *>>,
             columns: Set<Column<T, *>> = defaultColumns, order: Map<Column<T, *>, OrderByDirection> = defaultOrder
     ): List<T>
+
+    @Deprecated(message = "Only for binary compatibility.", level = DeprecationLevel.HIDDEN)
+    fun findByExample(
+            example: T, exampleColumns: Set<Column<T, *>>,
+            columns: Set<Column<T, *>> = defaultColumns
+    ): List<T> = findByExample(example, exampleColumns, columns, defaultOrder)
 
     fun update(oldValue: T, newValue: T, deltaOnly: Boolean = false): T
 
