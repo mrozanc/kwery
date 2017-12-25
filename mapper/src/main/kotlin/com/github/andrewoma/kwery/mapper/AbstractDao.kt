@@ -116,21 +116,25 @@ abstract class AbstractDao<T : Any, ID : Any>(
         session.select(sql, table.idMap(session, id, nf), options(name), table.rowMapper(columns)).firstOrNull()
     }
 
-    override fun findAll(columns: Set<Column<T, *>>): List<T> = withTransaction {
+    override fun findAll(columns: Set<Column<T, *>>, order: Map<Column<T, *>, OrderByDirection>): List<T> = withTransaction {
         val name = "findAll"
-        val sql = sql(name to columns) { "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}" }
+        val sql = sql(Triple(name, columns, order)) { "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}${order.toOrderByClause()}" }
         session.select(sql, mapOf(), options(name), table.rowMapper(columns))
     }
 
-    override fun findByExample(example: T, exampleColumns: Set<Column<T, *>>, columns: Set<Column<T, *>>): List<T> =
+    override fun findByExample(
+            example: T, exampleColumns: Set<Column<T, *>>,
+            columns: Set<Column<T, *>>,
+            order: Map<Column<T, *>, OrderByDirection>
+    ): List<T> =
             if (exampleColumns.isEmpty()) {
                 findAll(columns)
             } else withTransaction {
                 val name = "findByExample"
 
                 val exampleMap = table.objectMap(session, example, exampleColumns, nf)
-                val sql = sql(Triple(name, exampleColumns, columns)) {
-                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}"
+                val sql = sql(Triple(name, exampleColumns to columns, order)) { // wow, that's ugly
+                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}${order.toOrderByClause()}"
                 }
                 session.select(sql, exampleMap, options(name), table.rowMapper(columns))
             }
@@ -438,6 +442,9 @@ abstract class AbstractDao<T : Any, ID : Any>(
             id(table.rowMapper(table.idColumns, nf)(row))
         }
     }
+
+    private fun Map<Column<T, *>, OrderByDirection>.toOrderByClause() = if (isEmpty()) "" else
+        entries.joinToString(prefix = " ORDER BY ") { session.dialect.escapeName(it.key.name) + ' ' + it.value.name }
 }
 
 enum class IdStrategy {

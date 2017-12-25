@@ -26,6 +26,8 @@ package com.github.andrewoma.kwery.mapper
 interface Dao<T : Any, ID : Any> {
     val defaultColumns: Set<Column<T, *>>
     val defaultIdStrategy: IdStrategy
+    val defaultOrder: Map<Column<T, *>, OrderByDirection>
+        get() = emptyMap()
 
     fun findById(id: ID, columns: Set<Column<T, *>> = defaultColumns): T?
 
@@ -42,9 +44,12 @@ interface Dao<T : Any, ID : Any> {
 
     fun findByIds(ids: Collection<ID>, columns: Set<Column<T, *>> = defaultColumns): Map<ID, T>
 
-    fun findAll(columns: Set<Column<T, *>> = defaultColumns): List<T>
+    fun findAll(columns: Set<Column<T, *>> = defaultColumns, order: Map<Column<T, *>, OrderByDirection> = defaultOrder): List<T>
 
-    fun findByExample(example: T, exampleColumns: Set<Column<T, *>>, columns: Set<Column<T, *>> = defaultColumns): List<T>
+    fun findByExample(
+            example: T, exampleColumns: Set<Column<T, *>>,
+            columns: Set<Column<T, *>> = defaultColumns, order: Map<Column<T, *>, OrderByDirection> = defaultOrder
+    ): List<T>
 
     fun update(oldValue: T, newValue: T, deltaOnly: Boolean = false): T
 
