@@ -122,8 +122,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
     override fun findAll(columns: Set<Column<T, *>>, order: Map<Column<T, *>, OrderByDirection>): List<T> = withTransaction {
         val name = "findAll"
-        val sql = sql(Triple(name, columns, order)) { "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}${order.toOrderByClause()}" }
-        val sql = sql(name to columns) { "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}" }
+        val sql = sql(Triple(name, columns, order)) { "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}${order.toOrderByClause()}" }
         session.select(sql, mapOf(), options(name), table.rowMapper(columns))
     }
 
@@ -139,9 +138,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
                 val exampleMap = table.objectMap(session, example, exampleColumns, nf)
                 val sql = sql(Triple(name, exampleColumns to columns, order)) { // wow, that's ugly
-                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}${order.toOrderByClause()}"
-                val sql = sql(Triple(name, exampleColumns, columns)) {
-                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}"
+                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}${order.toOrderByClause()}"
                 }
                 session.select(sql, exampleMap, options(name), table.rowMapper(columns))
             }
