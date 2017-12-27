@@ -47,6 +47,8 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
     private val listeners = linkedSetOf<Listener>()
 
+    private val escapedTableName = session.dialect.escapeName(table.name)
+
     fun addListener(listener: Listener) {
         listeners.add(listener)
     }
@@ -107,7 +109,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
     override fun findById(id: ID, columns: Set<Column<T, *>>): T? = withTransaction {
         val name = "findById"
         val sql = sql(name to columns) {
-            "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}"
+            "select ${columns.joinNames()} \nfrom $escapedTableName \nwhere ${table.idColumns.equate(" and ")}"
         }
         session.select(sql, table.idMap(session, id, nf), options(name), table.rowMapper(columns)).firstOrNull()
     }
@@ -115,14 +117,14 @@ abstract class AbstractDao<T : Any, ID : Any>(
     override fun findByIdForUpdate(id: ID, columns: Set<Column<T, *>>): T? = withTransaction {
         val name = "findByIdForUpdate"
         val sql = sql(name to columns) {
-            "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}\nfor update"
+            "select ${columns.joinNames()} \nfrom $escapedTableName \nwhere ${table.idColumns.equate(" and ")}\nfor update"
         }
         session.select(sql, table.idMap(session, id, nf), options(name), table.rowMapper(columns)).firstOrNull()
     }
 
     override fun findAll(columns: Set<Column<T, *>>, order: Map<Column<T, *>, OrderByDirection>): List<T> = withTransaction {
         val name = "findAll"
-        val sql = sql(Triple(name, columns, order)) { "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}${order.toOrderByClause()}" }
+        val sql = sql(Triple(name, columns, order)) { "select ${columns.joinNames()} \nfrom $escapedTableName${order.toOrderByClause()}" }
         session.select(sql, mapOf(), options(name), table.rowMapper(columns))
     }
 
@@ -138,7 +140,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
                 val exampleMap = table.objectMap(session, example, exampleColumns, nf)
                 val sql = sql(Triple(name, exampleColumns to columns, order)) { // wow, that's ugly
-                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}${order.toOrderByClause()}"
+                    "select ${columns.joinNames()} \nfrom $escapedTableName\nwhere ${exampleColumns.equate(" and ")}${order.toOrderByClause()}"
                 }
                 session.select(sql, exampleMap, options(name), table.rowMapper(columns))
             }
@@ -174,7 +176,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
             val differences = difference(oldMap, newMap)
             val sql = sql(name to differences) {
                 val columns = differences.keys.joinToString(", ") { "$it = :$it" }
-                "update ${session.dialect.escapeName(table.name)} \n" +
+                "update $escapedTableName \n" +
                         "set $columns \n" +
                         "where ${table.idColumns.equate(" and ")} and $versionCol = :$oldVersionParam"
             }
@@ -187,7 +189,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
         fun full(): Pair<String, HashMap<String, Any?>> {
             val sql = sql(name) {
-                "update ${session.dialect.escapeName(table.name)} \n" +
+                "update $escapedTableName \n" +
                         "set ${table.dataColumns.equate()} \n" +
                         "where ${table.idColumns.equate(" and ")} and $versionCol = :$oldVersionParam"
             }
@@ -220,7 +222,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
     override fun delete(id: ID): Int = withTransaction {
         val name = "delete"
-        val sql = sql(name) { "delete from ${session.dialect.escapeName(table.name)} where ${table.idColumns.equate(" and ")}" }
+        val sql = sql(name) { "delete from $escapedTableName where ${table.idColumns.equate(" and ")}" }
         val count = session.update(sql, table.idMap(session, id, nf), options(name))
 
         fireEvent { DeleteEvent(table, id, null) }
@@ -233,7 +235,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
         val new = fireTransformingEvent(newValue) { PreUpdateEvent(table, id(newValue), newValue, null) }
 
         val sql = sql(name) {
-            "update ${table.name}\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")}"
+            "update $escapedTableName\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")}"
         }
         val newMap = table.objectMap(session, new, table.allColumns)
 
@@ -259,7 +261,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
         }
 
         val columns = if (generateKeys) table.dataColumns else table.allColumns
-        val sql = sql(name) { "insert into ${session.dialect.escapeName(table.name)} (${columns.joinNames()}) \n" +
+        val sql = sql(name) { "insert into $escapedTableName (${columns.joinNames()}) \n" +
                 "values (${columns.joinStrings { ":${it.name}" }})" }
 
         val inserted = if (generateKeys) {
@@ -294,7 +296,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
         val generateKeys = isGeneratedKey(new, idStrategy)
 
         val columns = if (generateKeys) table.dataColumns else table.allColumns
-        val sql = sql(name to columns) { "insert into ${session.dialect.escapeName(table.name)} (${columns.joinNames()}) \n" +
+        val sql = sql(name to columns) { "insert into $escapedTableName (${columns.joinNames()}) \n" +
                 "values (${columns.joinStrings { ":${it.name}" }})" }
         val parameters = table.objectMap(session, new, columns, nf)
 
@@ -328,7 +330,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
             val values = if (session.dialect.supportsArrayBasedIn) {
                 val sql = sql(name to columns) {
-                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} " +
+                    "select ${columns.joinNames()} \nfrom $escapedTableName \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} " +
                             session.dialect.arrayBasedIn("ids")
                 }
                 val array = ids.copyToSqlArray()
@@ -339,7 +341,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
                 }
             } else {
                 val sql = sql(name to columns) {
-                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} in (:ids)"
+                    "select ${columns.joinNames()} \nfrom $escapedTableName \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} in (:ids)"
                 }
                 session.select(sql, mapOf("ids" to ids), options(name), table.rowMapper(columns))
             }
@@ -367,7 +369,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
         val updates = new.map { table.objectMap(session, it, table.allColumns) }
 
         val sql = sql(name) {
-            "update ${session.dialect.escapeName(table.name)}\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")}"
+            "update $escapedTableName\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")}"
         }
 
         val counts = session.batchUpdate(sql, updates, options(name))
@@ -416,7 +418,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
         }
 
         val sql = sql(name) {
-            "update ${session.dialect.escapeName(table.name)}\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")} and $versionCol = :$oldVersionParam"
+            "update $escapedTableName\nset ${table.dataColumns.equate()} \nwhere ${table.idColumns.equate(" and ")} and $versionCol = :$oldVersionParam"
         }
 
         val counts = session.batchUpdate(sql, updates.map { it.first }, options(name))
