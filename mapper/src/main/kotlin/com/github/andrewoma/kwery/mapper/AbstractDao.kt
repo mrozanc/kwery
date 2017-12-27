@@ -43,7 +43,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
     override val defaultColumns = table.defaultColumns
 
-    protected val columns = table.defaultColumns.join()
+    protected val columns = table.defaultColumns.joinNames()
 
     private val listeners = linkedSetOf<Listener>()
 
@@ -75,7 +75,11 @@ abstract class AbstractDao<T : Any, ID : Any>(
         return this.groupBy { it.first }.map { apply(it.key, it.value.map { it.second }) }
     }
 
-    protected fun Iterable<Column<T, *>>.join(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
+    protected fun Iterable<Column<T, *>>.joinNames(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
+        return this.joinToString(separator) { session.dialect.escapeName(f(it)) }
+    }
+
+    protected fun Iterable<Column<T, *>>.joinStrings(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
         return this.joinToString(separator) { session.dialect.escapeName(f(it)) }
     }
 
@@ -103,7 +107,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
     override fun findById(id: ID, columns: Set<Column<T, *>>): T? = withTransaction {
         val name = "findById"
         val sql = sql(name to columns) {
-            "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}"
+            "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}"
         }
         session.select(sql, table.idMap(session, id, nf), options(name), table.rowMapper(columns)).firstOrNull()
     }
@@ -111,14 +115,14 @@ abstract class AbstractDao<T : Any, ID : Any>(
     override fun findByIdForUpdate(id: ID, columns: Set<Column<T, *>>): T? = withTransaction {
         val name = "findByIdForUpdate"
         val sql = sql(name to columns) {
-            "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}\nfor update"
+            "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${table.idColumns.equate(" and ")}\nfor update"
         }
         session.select(sql, table.idMap(session, id, nf), options(name), table.rowMapper(columns)).firstOrNull()
     }
 
     override fun findAll(columns: Set<Column<T, *>>): List<T> = withTransaction {
         val name = "findAll"
-        val sql = sql(name to columns) { "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}" }
+        val sql = sql(name to columns) { "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}" }
         session.select(sql, mapOf(), options(name), table.rowMapper(columns))
     }
 
@@ -130,7 +134,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
                 val exampleMap = table.objectMap(session, example, exampleColumns, nf)
                 val sql = sql(Triple(name, exampleColumns, columns)) {
-                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}"
+                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)}\nwhere ${exampleColumns.equate(" and ")}"
                 }
                 session.select(sql, exampleMap, options(name), table.rowMapper(columns))
             }
@@ -251,8 +255,8 @@ abstract class AbstractDao<T : Any, ID : Any>(
         }
 
         val columns = if (generateKeys) table.dataColumns else table.allColumns
-        val sql = sql(name) { "insert into ${session.dialect.escapeName(table.name)} (${columns.join()}) \n" +
-                "values (${columns.join { ":${it.name}" }})" }
+        val sql = sql(name) { "insert into ${session.dialect.escapeName(table.name)} (${columns.joinNames()}) \n" +
+                "values (${columns.joinStrings { ":${it.name}" }})" }
 
         val inserted = if (generateKeys) {
             val list = session.batchInsert(sql, new.map { table.objectMap(session, it, columns, nf) }, options(name),
@@ -286,8 +290,8 @@ abstract class AbstractDao<T : Any, ID : Any>(
         val generateKeys = isGeneratedKey(new, idStrategy)
 
         val columns = if (generateKeys) table.dataColumns else table.allColumns
-        val sql = sql(name to columns) { "insert into ${session.dialect.escapeName(table.name)} (${columns.join()}) \n" +
-                "values (${columns.join { ":${it.name}" }})" }
+        val sql = sql(name to columns) { "insert into ${session.dialect.escapeName(table.name)} (${columns.joinNames()}) \n" +
+                "values (${columns.joinStrings { ":${it.name}" }})" }
         val parameters = table.objectMap(session, new, columns, nf)
 
         val (count, inserted) = if (generateKeys) {
@@ -320,7 +324,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
 
             val values = if (session.dialect.supportsArrayBasedIn) {
                 val sql = sql(name to columns) {
-                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} " +
+                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} " +
                             session.dialect.arrayBasedIn("ids")
                 }
                 val array = ids.copyToSqlArray()
@@ -331,7 +335,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
                 }
             } else {
                 val sql = sql(name to columns) {
-                    "select ${columns.join()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} in (:ids)"
+                    "select ${columns.joinNames()} \nfrom ${session.dialect.escapeName(table.name)} \nwhere ${session.dialect.escapeName(table.idColumns.first().name)} in (:ids)"
                 }
                 session.select(sql, mapOf("ids" to ids), options(name), table.rowMapper(columns))
             }
