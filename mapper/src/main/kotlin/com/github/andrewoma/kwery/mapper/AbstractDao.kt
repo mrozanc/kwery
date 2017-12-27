@@ -80,7 +80,7 @@ abstract class AbstractDao<T : Any, ID : Any>(
     }
 
     protected fun Iterable<Column<T, *>>.joinStrings(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
-        return this.joinToString(separator) { session.dialect.escapeName(f(it)) }
+        return this.joinToString(separator) { f(it) }
     }
 
     protected fun Iterable<Column<T, *>>.equate(separator: String = ", ", f: (Column<T, *>) -> String = nf): String {
