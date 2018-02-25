@@ -118,15 +118,22 @@ class EnumByNameConverter<T : Enum<T>>(type: Class<T>) : SimpleConverter<T>(
         { it.name }
 )
 
-fun <E : Enum<E>> EnumSetConverter(eType: Class<E>): Converter<Set<E>> {
-    eType.enumConstants.forEach {
-        check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
+class EnumSetConverter<E : Enum<E>>(
+        // exposing type intentionally, theoretically `type` may become public property of Converter
+        val eType: Class<E>
+): Converter<Set<E>>(
+        { row, s ->
+            val values = row.string(s)
+            if (values.isEmpty()) emptySet()
+            else values.split('|').mapTo(EnumSet.noneOf(eType)) { java.lang.Enum.valueOf(eType, it) }
+        },
+        { _, set -> set.joinToString("|", transform = Enum<E>::name) }
+) {
+
+    init {
+        eType.enumConstants.forEach {
+            check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
+        }
     }
-    val from: (Row, String) -> Set<E> = { row, s ->
-        val values = row.string(s)
-        if (values.isEmpty()) emptySet()
-        else values.split('|').mapTo(EnumSet.noneOf(eType)) { java.lang.Enum.valueOf(eType, it) }
-    }
-    val to: (Connection, Set<E>) -> Any? = { _, set -> set.joinToString("|", transform = Enum<E>::name) }
-    return Converter(from, to)
+
 }
