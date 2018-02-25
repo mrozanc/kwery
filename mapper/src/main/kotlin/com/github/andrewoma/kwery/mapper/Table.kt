@@ -25,12 +25,13 @@ package com.github.andrewoma.kwery.mapper
 import com.github.andrewoma.kommon.collection.hashMapOfExpectedSize
 import com.github.andrewoma.kwery.core.Row
 import com.github.andrewoma.kwery.core.Session
-import sun.misc.SharedSecrets
 import java.lang.reflect.ParameterizedType
-import java.sql.Connection
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
-import kotlin.reflect.*
+import kotlin.reflect.KClass
+import kotlin.reflect.KProperty
+import kotlin.reflect.KProperty1
+import kotlin.reflect.KType
 import kotlin.reflect.full.defaultType
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.jvmErasure
@@ -171,23 +172,10 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
     private fun <T> converterForParameterized(type: KType): Converter<T> = when (type.jvmErasure.java) {
         Set::class.java -> {
             val e = (type.javaType as ParameterizedType).actualTypeArguments[0]
-            if (e is Class<*> && e.isEnum) enumSetConverter(e as Class<DummyEnum>) as Converter<T>
+            if (e is Class<*> && e.isEnum) EnumSetConverter(e as Class<DummyEnum>) as Converter<T>
             else error("Sets of $e are not supported.")
         }
         else -> error("Parameterized type ${type.javaType} is not supported.")
-    }
-
-    private fun <E : Enum<E>> enumSetConverter(eType: Class<E>): Converter<Set<E>> {
-        SharedSecrets.getJavaLangAccess().getEnumConstantsShared(eType).forEach {
-            check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
-        }
-        val from: (Row, String) -> Set<E> = { row, s ->
-            val values = row.string(s)
-            if (values.isEmpty()) emptySet()
-            else values.split('|').mapTo(EnumSet.noneOf(eType)) { java.lang.Enum.valueOf(eType, it) }
-        }
-        val to: (Connection, Set<E>) -> Any? = { _, set -> set.joinToString("|", transform = Enum<E>::name) }
-        return Converter(from, to)
     }
 
     @Suppress("UNCHECKED_CAST")

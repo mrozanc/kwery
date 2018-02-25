@@ -28,6 +28,7 @@ import java.sql.Connection
 import java.sql.Date
 import java.sql.Time
 import java.sql.Timestamp
+import java.util.*
 
 open class Converter<R>(
         val from: (Row, String) -> R,
@@ -116,3 +117,16 @@ class EnumByNameConverter<T : Enum<T>>(type: Class<T>) : SimpleConverter<T>(
         { row, c -> java.lang.Enum.valueOf(type, row.string(c)) },
         { it.name }
 )
+
+fun <E : Enum<E>> EnumSetConverter(eType: Class<E>): Converter<Set<E>> {
+    eType.enumConstants.forEach {
+        check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
+    }
+    val from: (Row, String) -> Set<E> = { row, s ->
+        val values = row.string(s)
+        if (values.isEmpty()) emptySet()
+        else values.split('|').mapTo(EnumSet.noneOf(eType)) { java.lang.Enum.valueOf(eType, it) }
+    }
+    val to: (Connection, Set<E>) -> Any? = { _, set -> set.joinToString("|", transform = Enum<E>::name) }
+    return Converter(from, to)
+}
