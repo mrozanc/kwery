@@ -172,7 +172,7 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
     private fun <T> converterForParameterized(type: KType): Converter<T> = when (type.jvmErasure.java) {
         Set::class.java -> {
             val e = (type.javaType as ParameterizedType).actualTypeArguments[0]
-            if (e is Class<*> && e.isEnum) EnumSetConverter(e as Class<DummyEnum>) as Converter<T>
+            if (e is Class<*> && e.isEnum) EnumSetConverter(type, e as Class<DummyEnum>) as Converter<T>
             else error("Sets of $e are not supported.")
         }
         else -> error("Parameterized type ${type.javaType} is not supported.")

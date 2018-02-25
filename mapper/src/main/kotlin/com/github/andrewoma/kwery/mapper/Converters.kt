@@ -23,12 +23,15 @@
 package com.github.andrewoma.kwery.mapper
 
 import com.github.andrewoma.kwery.core.Row
+import java.lang.reflect.ParameterizedType
 import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.Date
 import java.sql.Time
 import java.sql.Timestamp
 import java.util.*
+import kotlin.reflect.KType
+import kotlin.reflect.jvm.javaType
 
 open class Converter<R>(
         val from: (Row, String) -> R,
@@ -119,7 +122,8 @@ class EnumByNameConverter<T : Enum<T>>(type: Class<T>) : SimpleConverter<T>(
 )
 
 class EnumSetConverter<E : Enum<E>>(
-        // exposing type intentionally, theoretically `type` may become public property of Converter
+        // exposing types intentionally, theoretically `type` may become public property of Converter
+        val kType: KType,
         val eType: Class<E>
 ): Converter<Set<E>>(
         { row, s ->
@@ -130,9 +134,15 @@ class EnumSetConverter<E : Enum<E>>(
         { _, set -> set.joinToString("|", transform = Enum<E>::name) }
 ) {
 
-    val type get() = Set::class.java
+    val type = kType.javaType
 
     init {
+        check(type === kType.javaType)
+        check(type is ParameterizedType)
+        type as ParameterizedType
+        check(type.rawType === Set::class.java)
+        check(type.actualTypeArguments[0] is Class<*>)
+        check(Enum::class.java.isAssignableFrom(type.actualTypeArguments[0] as Class<*>))
         eType.enumConstants.forEach {
             check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
         }
