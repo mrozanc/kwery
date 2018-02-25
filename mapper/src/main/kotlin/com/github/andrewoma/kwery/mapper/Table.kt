@@ -25,12 +25,15 @@ package com.github.andrewoma.kwery.mapper
 import com.github.andrewoma.kommon.collection.hashMapOfExpectedSize
 import com.github.andrewoma.kwery.core.Row
 import com.github.andrewoma.kwery.core.Session
+import sun.misc.SharedSecrets
 import java.lang.reflect.ParameterizedType
+import java.sql.Connection
 import java.util.*
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.*
 import kotlin.reflect.full.defaultType
 import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.jvmErasure
 
 
 /**
@@ -142,7 +145,6 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
     // Can't cast T to Enum<T> due to recursive type, so cast to any enum to satisfy compiler
     private enum class DummyEnum
 
-    @Suppress("UNCHECKED_CAST", "IMPLICIT_CAST_TO_UNIT_OR_ANY", "CAST_NEVER_SUCCEEDS")
     protected fun <T> converter(type: KType): Converter<T> {
         // TODO ... converters are currently defined as Java classes as I can't figure out how to
         // convert a nullable KType into its non-nullable equivalent
@@ -150,17 +152,42 @@ abstract class Table<T : Any, ID>(val name: String, val config: TableConfigurati
         val javaType = type.javaType
         return when (javaType) {
             is Class<*> -> converterForClass(type)
+            is ParameterizedType -> converterForParameterized(type)
             else -> error("Type $javaType is not supported.")
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun <T> converterForClass(type: KType): Converter<T> {
-        val javaClass = type.javaClass
-        val converter = config.converters[javaClass]
+        val javaClass = type.javaType as Class<*>
+        val converter = config.converters [javaClass]
                 ?: if (javaClass.isEnum) EnumByNameConverter(javaClass as Class<DummyEnum>) as Converter<T> else null
 
         checkNotNull(converter) { "Converter undefined for type $type as $javaClass" }
         return (if (type.isMarkedNullable) optional(converter!! as Converter<Any>) else converter) as Converter<T>
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> converterForParameterized(type: KType): Converter<T> = when (type.jvmErasure.java) {
+        Set::class.java -> {
+            val e = (type.javaType as ParameterizedType).actualTypeArguments[0]
+            if (e is Class<*> && e.isEnum) enumSetConverter(e as Class<DummyEnum>) as Converter<T>
+            else error("Sets of $e are not supported.")
+        }
+        else -> error("Parameterized type ${type.javaType} is not supported.")
+    }
+
+    private fun <E : Enum<E>> enumSetConverter(eType: Class<E>): Converter<Set<E>> {
+        SharedSecrets.getJavaLangAccess().getEnumConstantsShared(eType).forEach {
+            check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
+        }
+        val from: (Row, String) -> Set<E> = { row, s ->
+            val values = row.string(s)
+            if (values.isEmpty()) emptySet()
+            else values.split('|').mapTo(EnumSet.noneOf(eType)) { java.lang.Enum.valueOf(eType, it) }
+        }
+        val to: (Connection, Set<E>) -> Any? = { _, set -> set.joinToString("|", transform = Enum<E>::name) }
+        return Converter(from, to)
     }
 
     @Suppress("UNCHECKED_CAST")
