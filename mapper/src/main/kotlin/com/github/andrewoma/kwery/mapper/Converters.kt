@@ -130,6 +130,8 @@ class EnumSetConverter<E : Enum<E>>(
         { _, set -> set.joinToString("|", transform = Enum<E>::name) }
 ) {
 
+    val type get() = Set::class.java
+
     init {
         eType.enumConstants.forEach {
             check(!it.name.contains('|')) { "Hope this won't happen. Enum constant name contains |." }
